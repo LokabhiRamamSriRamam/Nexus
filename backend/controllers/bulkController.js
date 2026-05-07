@@ -1,4 +1,5 @@
-import XLSX from 'xlsx'
+import ExcelJS from 'exceljs'
+import { Readable } from 'stream'
 import Lead from '../models/Lead.js'
 import Zone from '../models/Zone.js'
 import Reminder from '../models/Reminder.js'
@@ -27,52 +28,55 @@ export const COLUMNS = [
   'Notes',
 ]
 
-export const downloadSample = (req, res) => {
-  const wb = XLSX.utils.book_new()
+export const downloadSample = async (req, res) => {
+  const wb = new ExcelJS.Workbook()
+  const ws = wb.addWorksheet('Leads')
 
-  // ── Sheet 1: Sample leads ──────────────────────────────────────
-  const sampleRows = [
-    {
-      'Business Name': 'Sharma Traders',
-      'Phone':          '+91 98765 43210',
-      'Email':          'sharma@traders.com',
-      'Client POC':     'Rajesh Sharma',
-      'Internal POC':   'Rahul (Sales)',
-      'Zone':           'North Delhi',
-      'Priority':       'P2',
-      'Source':         'call',
-      'Outcome':        'fresh-lead',
-      'Follow-up Date': '2026-05-20',
-      'Follow-up Time': '10:00',
-      'Maps Link':      'https://maps.google.com/?q=...',
-      'Address':        '12 Main Market, Karol Bagh',
-      'Notes':          '',
-    },
-  ]
-
-  const ws = XLSX.utils.json_to_sheet(sampleRows, { header: COLUMNS })
+  ws.columns = COLUMNS.map(col => ({ header: col, key: col }))
 
   // Set column widths for readability
-  ws['!cols'] = [
-    { wch: 25 }, // Business Name
-    { wch: 18 }, // Phone
-    { wch: 28 }, // Email
-    { wch: 18 }, // Client POC
-    { wch: 18 }, // Internal POC
-    { wch: 16 }, // Zone
-    { wch: 10 }, // Priority
-    { wch: 10 }, // Source
-    { wch: 22 }, // Outcome
-    { wch: 15 }, // Follow-up Date
-    { wch: 14 }, // Follow-up Time
-    { wch: 35 }, // Maps Link
-    { wch: 30 }, // Address
-    { wch: 30 }, // Notes
-  ]
+  ws.getColumn(1).width = 25 // Business Name
+  ws.getColumn(2).width = 18 // Phone
+  ws.getColumn(3).width = 28 // Email
+  ws.getColumn(4).width = 18 // Client POC
+  ws.getColumn(5).width = 18 // Internal POC
+  ws.getColumn(6).width = 16 // Zone
+  ws.getColumn(7).width = 10 // Priority
+  ws.getColumn(8).width = 10 // Source
+  ws.getColumn(9).width = 22 // Outcome
+  ws.getColumn(10).width = 15 // Follow-up Date
+  ws.getColumn(11).width = 14 // Follow-up Time
+  ws.getColumn(12).width = 35 // Maps Link
+  ws.getColumn(13).width = 30 // Address
+  ws.getColumn(14).width = 30 // Notes
 
-  XLSX.utils.book_append_sheet(wb, ws, 'Leads')
+  // ── Sheet 1: Sample leads ──────────────────────────────────────
+  const sampleRow = {
+    'Business Name': 'Sharma Traders',
+    'Phone':          '+91 98765 43210',
+    'Email':          'sharma@traders.com',
+    'Client POC':     'Rajesh Sharma',
+    'Internal POC':   'Rahul (Sales)',
+    'Zone':           'North Delhi',
+    'Priority':       'P2',
+    'Source':         'call',
+    'Outcome':        'fresh-lead',
+    'Follow-up Date': '2026-05-20',
+    'Follow-up Time': '10:00',
+    'Maps Link':      'https://maps.google.com/?q=...',
+    'Address':        '12 Main Market, Karol Bagh',
+    'Notes':          '',
+  }
+  ws.addRow(sampleRow)
 
   // ── Sheet 2: Valid Values reference ───────────────────────────
+  const wsRef = wb.addWorksheet('Valid Values')
+  wsRef.columns = [
+    { header: 'Column', key: 'Column', width: 18 },
+    { header: 'Valid Values / Format', key: 'Valid Values / Format', width: 65 },
+    { header: 'Default', key: 'Default', width: 14 },
+  ]
+
   const refRows = [
     { Column: 'Business Name', 'Valid Values / Format': '(required) Any text', Default: '' },
     { Column: 'Phone',         'Valid Values / Format': 'Include country code: +91 98765 43210', Default: '' },
@@ -89,26 +93,54 @@ export const downloadSample = (req, res) => {
     { Column: 'Address',       'Valid Values / Format': 'Any text', Default: '' },
     { Column: 'Notes',         'Valid Values / Format': 'Any text', Default: '' },
   ]
+  wsRef.addRows(refRows)
 
-  const wsRef = XLSX.utils.json_to_sheet(refRows, { header: ['Column', 'Valid Values / Format', 'Default'] })
-  wsRef['!cols'] = [{ wch: 18 }, { wch: 65 }, { wch: 14 }]
-  XLSX.utils.book_append_sheet(wb, wsRef, 'Valid Values')
-
-  const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' })
+  const buf = await wb.xlsx.writeBuffer()
   res.setHeader('Content-Disposition', 'attachment; filename="crm-leads-sample.xlsx"')
   res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
-  res.send(buf)
+  res.send(Buffer.from(buf))
 }
 
 export const bulkUpload = async (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'No file uploaded' })
 
-  let rows
+  let rows = []
   try {
-    const wb = XLSX.read(req.file.buffer, { type: 'buffer', cellDates: true })
-    const ws = wb.Sheets[wb.SheetNames[0]]  // always read first sheet
-    rows = XLSX.utils.sheet_to_json(ws, { defval: '' })
-  } catch {
+    const wb = new ExcelJS.Workbook()
+    const isCsv = req.file.originalname.toLowerCase().endsWith('.csv')
+    
+    if (isCsv) {
+      const stream = Readable.from(req.file.buffer)
+      await wb.csv.read(stream)
+    } else {
+      await wb.xlsx.load(req.file.buffer)
+    }
+
+    const ws = wb.worksheets[0] // always read first sheet
+    if (!ws) throw new Error("No worksheets found")
+
+    const headers = []
+    ws.getRow(1).eachCell({ includeEmpty: true }, (cell, colNumber) => {
+      headers[colNumber] = cell.value
+    })
+
+    ws.eachRow((row, rowNumber) => {
+      if (rowNumber === 1) return // skip header
+      const rowData = {}
+      row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
+        let val = cell.value
+        // Handle formulas and rich text
+        if (val && typeof val === 'object') {
+          if (val.result !== undefined) val = val.result
+          else if (val.richText) val = val.richText.map(t => t.text).join('')
+        }
+        if (headers[colNumber]) {
+          rowData[headers[colNumber]] = val
+        }
+      })
+      rows.push(rowData)
+    })
+  } catch (err) {
     return res.status(400).json({ error: 'Could not parse file. Upload a valid .xlsx or .csv file.' })
   }
 
