@@ -17,16 +17,23 @@
 const USERS = [
   {
     id:       'user-1',
-    username: 'admin',
-    password: 'admin123',
-    name:     'Administrator',
+    username: 'avtanshg',
+    password: 'JaiSriGanesha/99',
+    name:     'Avtansh Giri',
     role:     'admin',
   },
   {
     id:       'user-2',
-    username: 'sales1',
-    password: 'sales123',
-    name:     'Sales Rep 1',
+    username: 'yashitgupta',
+    password: 'JaiSriGanesha/99',
+    name:     'Yashit Gupta',
+    role:     'sales',
+  },
+  {
+    id:       'user-3',
+    username: 'boorlaboorla21',
+    password: 'JaiSriGanesha/99',
+    name:     'Shravan Kumar Boorla',
     role:     'sales',
   },
 ]
