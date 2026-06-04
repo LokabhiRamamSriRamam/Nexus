@@ -4,7 +4,9 @@ import mongoose from 'mongoose'
 // outcome = what the result was (stage-specific, drives stage advances)
 const interactionSchema = new mongoose.Schema(
   {
-    leadId:  { type: mongoose.Schema.Types.ObjectId, ref: 'Lead', required: true },
+    // An interaction belongs to either a Lead or a Partner (partnership pipeline)
+    leadId:    { type: mongoose.Schema.Types.ObjectId, ref: 'Lead' },
+    partnerId: { type: mongoose.Schema.Types.ObjectId, ref: 'Partner' },
     date:    { type: Date, required: true, default: Date.now },
     time:    { type: String },
     method:  {

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { NavLink } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
-  LayoutDashboard, PhoneCall, TrendingUp, Handshake,
+  LayoutDashboard, PhoneCall, TrendingUp, Handshake, Users,
   Settings, ChevronRight, ChevronLeft,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -12,6 +12,7 @@ const NAV = [
   { to: '/pre-sales',      icon: PhoneCall,        label: 'Pre-Sales' },
   { to: '/sales-pipeline', icon: TrendingUp,       label: 'Sales Pipeline' },
   { to: '/post-sales',     icon: Handshake,        label: 'Post-Sales' },
+  { to: '/partnerships',   icon: Users,            label: 'Partnerships' },
   { to: '/settings',       icon: Settings,         label: 'Settings' },
 ]
 

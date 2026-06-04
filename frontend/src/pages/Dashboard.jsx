@@ -2,13 +2,15 @@ import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import {
   Bell, Users, TrendingUp, RefreshCw, AlertTriangle,
-  IndianRupee, Briefcase, Calendar,
+  IndianRupee, Briefcase, Calendar, Handshake, LayoutDashboard, CalendarCheck,
 } from 'lucide-react'
+import { Link } from 'react-router-dom'
 import {
   BarChart, Bar, Cell, XAxis, YAxis, Tooltip, ResponsiveContainer,
   AreaChart, Area, CartesianGrid,
 } from 'recharts'
 import { useReminderStore } from '@/store/reminderStore'
+import RepOverview from '@/components/RepOverview'
 import dayjs from 'dayjs'
 
 /* ── Stat card ────────────────────────────────────────────────── */
@@ -57,6 +59,7 @@ function SectionHead({ label }) {
 export default function Dashboard() {
   const { todayCount, todayReminders } = useReminderStore()
   const [summary, setSummary] = useState(null)
+  const [tab, setTab] = useState('overview')
 
   useEffect(() => {
     fetch('/api/dashboard/summary')
@@ -85,6 +88,29 @@ export default function Dashboard() {
 
   return (
     <div className="p-3 md:p-5 space-y-5 md:space-y-7 max-w-[1200px] mx-auto">
+
+      {/* ── Tab toggle ─────────────────────────────────────────── */}
+      <div className="flex items-center gap-1 bg-[#141414] border border-[#242424] rounded-lg p-1 w-fit">
+        {[
+          { k: 'overview', l: 'Overview',        icon: LayoutDashboard },
+          { k: 'today',    l: "Today's Overview", icon: CalendarCheck },
+        ].map(({ k, l, icon: Icon }) => (
+          <button
+            key={k}
+            onClick={() => setTab(k)}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+              tab === k ? 'bg-accent text-background' : 'text-[#888] hover:text-[#ccc]'
+            }`}
+          >
+            <Icon size={13} /> {l}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'today' ? (
+        <RepOverview />
+      ) : (
+       <>
 
       {/* ── Stat cards ─────────────────────────────────────────── */}
       <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-2 md:gap-3">
@@ -132,6 +158,25 @@ export default function Dashboard() {
           color="text-accent"
           delay={0.20}
         />
+      </div>
+
+      {/* ── Partnerships highlight ─────────────────────────────── */}
+      <div>
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-[#555] text-[10px] font-medium uppercase tracking-widest">Partnerships</h2>
+          <Link to="/partnerships" className="text-accent/70 hover:text-accent text-[11px] transition-colors">View all →</Link>
+        </div>
+        <div className="grid grid-cols-3 gap-2 md:gap-3">
+          <StatCard icon={Handshake} label="Active Partners" value={summary?.activePartners} color="text-accent" delay={0} />
+          <StatCard icon={Users} label="Partner-Sourced Leads" value={summary?.partnerSourcedLeads} color="text-info" delay={0.04} />
+          <StatCard
+            icon={IndianRupee}
+            label="Partner Revenue"
+            value={summary?.partnerRevenue != null ? fmtRevenue(summary.partnerRevenue) : '—'}
+            color="text-[#22C55E]"
+            delay={0.08}
+          />
+        </div>
       </div>
 
       {/* ── Charts row ─────────────────────────────────────────── */}
@@ -309,6 +354,8 @@ export default function Dashboard() {
           </div>
         )}
       </div>
+       </>
+      )}
     </div>
   )
 }

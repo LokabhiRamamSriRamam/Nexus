@@ -18,7 +18,8 @@ const PRIORITY_CLS = {
 }
 
 function ReminderRow({ reminder, showDone = false, onDone }) {
-  const lead     = reminder.leadId
+  const isPartner = !reminder.leadId && !!reminder.partnerId
+  const subject  = reminder.leadId ?? reminder.partnerId
   const date     = dayjs(reminder.reminderDate)
   const isOverdue = date.isBefore(dayjs(), 'day')
 
@@ -32,18 +33,25 @@ function ReminderRow({ reminder, showDone = false, onDone }) {
       className="bg-[#141414] border border-[#262626] rounded-lg px-4 py-3 flex items-start gap-3"
     >
       {/* Priority badge */}
-      {lead?.priority && (
-        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border shrink-0 mt-0.5 ${PRIORITY_CLS[lead.priority] ?? PRIORITY_CLS.P2}`}>
-          {lead.priority}
+      {subject?.priority && (
+        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border shrink-0 mt-0.5 ${PRIORITY_CLS[subject.priority] ?? PRIORITY_CLS.P2}`}>
+          {subject.priority}
         </span>
       )}
 
       {/* Info */}
       <div className="flex-1 min-w-0">
-        <p className="text-[#f0f0f0] text-sm font-medium truncate">{lead?.businessName ?? '—'}</p>
+        <p className="text-[#f0f0f0] text-sm font-medium truncate flex items-center gap-1.5">
+          {subject?.businessName ?? '—'}
+          {isPartner && (
+            <span className="text-[9px] text-accent bg-accent/10 border border-accent/25 px-1.5 py-0.5 rounded shrink-0">Partner</span>
+          )}
+        </p>
         <p className="text-[#555] text-xs mt-0.5 truncate">
-          {[lead?.internalPOC, lead?.clientPOC].filter(Boolean).join(' → ')}
-          {lead?.phone && <span className="ml-2 font-mono">{lead.phone}</span>}
+          {isPartner
+            ? [subject?.contactName, subject?.phone].filter(Boolean).join(' · ')
+            : [subject?.internalPOC, subject?.clientPOC].filter(Boolean).join(' → ')}
+          {!isPartner && subject?.phone && <span className="ml-2 font-mono">{subject.phone}</span>}
         </p>
         <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
           <span className={`flex items-center gap-1 text-[11px] font-mono ${isOverdue ? 'text-p0' : 'text-[#888]'}`}>

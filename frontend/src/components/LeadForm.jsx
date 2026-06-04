@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button'
 import { useLeadStore } from '@/store/leadStore'
 import { useZoneStore } from '@/store/zoneStore'
 import { useSalesRepStore } from '@/store/salesRepStore'
+import DatePicker from '@/components/ui/DatePicker'
 import dayjs from 'dayjs'
 import toast from 'react-hot-toast'
 
@@ -55,6 +56,7 @@ const EMPTY = {
   priority: 'P2',
   zone: '',
   source: 'call',
+  partnerId: '',
   followUpDate: '',
   followUpTime: '',
   notes: '',
@@ -68,6 +70,7 @@ export default function LeadForm() {
   const [form, setFormState] = useState(EMPTY)
   const [submitting, setSubmitting] = useState(false)
   const [errors, setErrors] = useState({})
+  const [partners, setPartners] = useState([])
 
   const setField = (key, value) => setFormState((f) => ({ ...f, [key]: value }))
 
@@ -75,6 +78,10 @@ export default function LeadForm() {
     if (!modalOpen) return
     fetchZones()
     fetchReps()
+    fetch('/api/partners/active')
+      .then((r) => r.json())
+      .then((d) => setPartners(Array.isArray(d) ? d : []))
+      .catch(() => setPartners([]))
     if (editingLead) {
       // Parse stored phone: strip leading country code if present
       let storedPhone = editingLead.phone || ''
@@ -98,6 +105,7 @@ export default function LeadForm() {
         priority:     editingLead.priority || 'P2',
         zone:         editingLead.zone?._id || editingLead.zone || '',
         source:       editingLead.source || 'call',
+        partnerId:    editingLead.partnerId?._id || editingLead.partnerId || '',
         followUpDate: editingLead.followUpDate ? editingLead.followUpDate.split('T')[0] : '',
         followUpTime: editingLead.followUpTime || '',
         notes:        editingLead.notes || '',
@@ -133,6 +141,8 @@ export default function LeadForm() {
       if (!payload.followUpDate) delete payload.followUpDate
       if (!payload.followUpTime) delete payload.followUpTime
       if (!payload.phone)        delete payload.phone
+      // Only attribute to a partner when source is partnership
+      if (payload.source !== 'partnership' || !payload.partnerId) delete payload.partnerId
 
       if (editingLead) {
         await updateLead(editingLead._id, payload)
@@ -184,7 +194,7 @@ export default function LeadForm() {
           >
             {step === 0 && <StepBusinessInfo form={form} setField={setField} errors={errors} />}
             {step === 1 && <StepContact form={form} setField={setField} reps={reps} />}
-            {step === 2 && <StepClassify form={form} setField={setField} zones={zones} />}
+            {step === 2 && <StepClassify form={form} setField={setField} zones={zones} partners={partners} />}
             {step === 3 && <StepFollowUp form={form} setField={setField} />}
           </motion.div>
         </AnimatePresence>
@@ -339,7 +349,7 @@ function StepContact({ form, setField, reps }) {
 }
 
 /* ── Step 3: Classification ── */
-function StepClassify({ form, setField, zones }) {
+function StepClassify({ form, setField, zones, partners = [] }) {
   return (
     <StepCard>
       <Field label="Priority">
@@ -383,7 +393,7 @@ function StepClassify({ form, setField, zones }) {
 
       <Field label="Source">
         <div className="flex flex-wrap gap-2">
-          {['call', 'mail', 'referral', 'walk-in', 'other'].map((s) => (
+          {['call', 'mail', 'referral', 'walk-in', 'partnership', 'other'].map((s) => (
             <button
               key={s}
               type="button"
@@ -399,6 +409,25 @@ function StepClassify({ form, setField, zones }) {
           ))}
         </div>
       </Field>
+
+      {/* Partner attribution — only when sourced from a partnership */}
+      {form.source === 'partnership' && (
+        <Field label="Sourced by Partner">
+          <select
+            value={form.partnerId}
+            onChange={(e) => setField('partnerId', e.target.value)}
+            className={selectCls}
+          >
+            <option value="">Select partner</option>
+            {partners.map((p) => (
+              <option key={p._id} value={p._id}>{p.businessName}</option>
+            ))}
+          </select>
+          {partners.length === 0 && (
+            <p className="text-[11px] text-text-muted mt-1">No active partners yet — add one in Partnerships.</p>
+          )}
+        </Field>
+      )}
     </StepCard>
   )
 }
@@ -443,115 +472,3 @@ function StepFollowUp({ form, setField }) {
   )
 }
 
-/* ── Inline calendar date picker ── */
-function DatePicker({ value, onChange }) {
-  const [open, setOpen] = useState(false)
-  const ref = useRef(null)
-
-  // Close on outside click
-  useEffect(() => {
-    const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false) }
-    document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
-  }, [])
-
-  const current = value ? dayjs(value) : null
-  const [viewYear, setViewYear]   = useState((current ?? dayjs()).year())
-  const [viewMonth, setViewMonth] = useState((current ?? dayjs()).month())
-
-  const prevMonth = () => {
-    if (viewMonth === 0) { setViewMonth(11); setViewYear((y) => y - 1) }
-    else setViewMonth((m) => m - 1)
-  }
-  const nextMonth = () => {
-    if (viewMonth === 11) { setViewMonth(0); setViewYear((y) => y + 1) }
-    else setViewMonth((m) => m + 1)
-  }
-
-  const firstDay = dayjs(new Date(viewYear, viewMonth, 1))
-  const daysInMonth = firstDay.daysInMonth()
-  const startOffset = firstDay.day() // 0=Sun
-
-  const selectDay = (d) => {
-    const v = dayjs(new Date(viewYear, viewMonth, d)).format('YYYY-MM-DD')
-    onChange(v)
-    setOpen(false)
-  }
-
-  const displayLabel = current ? current.format('D MMM YYYY') : 'Select date'
-  const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
-  const DAYS   = ['Su','Mo','Tu','We','Th','Fr','Sa']
-
-  return (
-    <div ref={ref} className="relative">
-      <button
-        type="button"
-        onClick={() => setOpen((o) => !o)}
-        className="w-full flex items-center justify-between bg-[#0d0d0d] border border-[#2e2e2e] rounded-md px-3 h-9 text-sm text-left focus:outline-none focus:ring-1 focus:ring-accent transition-colors hover:border-[#444]"
-      >
-        <span className={current ? 'text-[#f0f0f0]' : 'text-[#555]'}>{displayLabel}</span>
-        <Calendar size={13} className="text-[#555] shrink-0" />
-      </button>
-
-      <AnimatePresence>
-        {open && (
-          <motion.div
-            initial={{ opacity: 0, y: -4, scale: 0.98 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -4, scale: 0.98 }}
-            transition={{ duration: 0.12 }}
-            className="absolute top-full left-0 mt-1.5 z-50 bg-[#111] border border-[#2a2a2a] rounded-lg p-3 shadow-xl w-[220px]"
-          >
-            {/* Month nav */}
-            <div className="flex items-center justify-between mb-2">
-              <button onClick={prevMonth} className="text-[#666] hover:text-[#ccc] px-1 transition-colors text-sm">‹</button>
-              <span className="text-[#ddd] text-xs font-medium">{MONTHS[viewMonth]} {viewYear}</span>
-              <button onClick={nextMonth} className="text-[#666] hover:text-[#ccc] px-1 transition-colors text-sm">›</button>
-            </div>
-
-            {/* Day headers */}
-            <div className="grid grid-cols-7 mb-1">
-              {DAYS.map((d) => (
-                <div key={d} className="text-center text-[10px] text-[#555] py-0.5">{d}</div>
-              ))}
-            </div>
-
-            {/* Day grid */}
-            <div className="grid grid-cols-7 gap-y-0.5">
-              {Array(startOffset).fill(null).map((_, i) => <div key={'e' + i} />)}
-              {Array(daysInMonth).fill(null).map((_, i) => {
-                const d = i + 1
-                const isSelected = current && current.date() === d && current.month() === viewMonth && current.year() === viewYear
-                const isToday = dayjs().date() === d && dayjs().month() === viewMonth && dayjs().year() === viewYear
-                return (
-                  <button
-                    key={d}
-                    onClick={() => selectDay(d)}
-                    className={cn(
-                      'text-center text-xs py-1 rounded transition-colors',
-                      isSelected ? 'bg-accent text-background font-bold'
-                      : isToday  ? 'text-accent font-semibold hover:bg-[#222]'
-                      : 'text-[#ccc] hover:bg-[#222]'
-                    )}
-                  >
-                    {d}
-                  </button>
-                )
-              })}
-            </div>
-
-            {/* Clear */}
-            {value && (
-              <button
-                onClick={() => { onChange(''); setOpen(false) }}
-                className="mt-2 w-full text-center text-[11px] text-[#555] hover:text-[#aaa] transition-colors"
-              >
-                Clear date
-              </button>
-            )}
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
-  )
-}

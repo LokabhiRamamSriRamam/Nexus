@@ -15,6 +15,7 @@ import Dashboard    from '@/pages/Dashboard'
 import PreSales     from '@/pages/PreSales'
 import SalesPipeline from '@/pages/SalesPipeline'
 import PostSales    from '@/pages/PostSales'
+import Partnerships from '@/pages/Partnerships'
 import Settings     from '@/pages/Settings'
 import Reminders    from '@/pages/Reminders'
 import Login        from '@/pages/Login'
@@ -61,6 +62,7 @@ const router = createBrowserRouter([
       { path: '/pre-sales',       element: <PreSales /> },
       { path: '/sales-pipeline',  element: <SalesPipeline /> },
       { path: '/post-sales',      element: <PostSales /> },
+      { path: '/partnerships',    element: <Partnerships /> },
       { path: '/settings',        element: <Settings /> },
       { path: '/reminders',       element: <Reminders /> },
     ],

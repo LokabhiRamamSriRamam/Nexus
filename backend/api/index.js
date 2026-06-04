@@ -7,6 +7,7 @@ import authRoutes from '../routes/auth.js'
 import leadRoutes from '../routes/leads.js'
 import interactionRoutes from '../routes/interactions.js'
 import dealRoutes from '../routes/deals.js'
+import partnerRoutes from '../routes/partners.js'
 import productRoutes from '../routes/products.js'
 import zoneRoutes from '../routes/zones.js'
 import reminderRoutes from '../routes/reminders.js'
@@ -48,6 +49,7 @@ app.use('/api', requireAuth)
 app.use('/api/leads', leadRoutes)
 app.use('/api/interactions', interactionRoutes)
 app.use('/api/deals', dealRoutes)
+app.use('/api/partners', partnerRoutes)
 app.use('/api/products', productRoutes)
 app.use('/api/zones', zoneRoutes)
 app.use('/api/reminders', reminderRoutes)

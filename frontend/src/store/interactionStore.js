@@ -35,4 +35,33 @@ export const useInteractionStore = create((set) => ({
     }))
     return { interaction, stageAdvanced: data.stageAdvanced ?? false, newStage: data.newStage ?? null, updatedLead: data.updatedLead ?? null }
   },
+
+  /* ── Partner interactions (partnership pipeline) ── */
+  fetchPartnerInteractions: async (partnerId) => {
+    set({ loading: true })
+    try {
+      const res = await fetch(`/api/partners/${partnerId}/interactions`)
+      const data = await res.json()
+      set((s) => ({ byLead: { ...s.byLead, [partnerId]: Array.isArray(data) ? data : [] } }))
+    } catch {
+      set((s) => ({ byLead: { ...s.byLead, [partnerId]: [] } }))
+    } finally {
+      set({ loading: false })
+    }
+  },
+
+  createPartnerInteraction: async (partnerId, payload) => {
+    const res = await fetch(`/api/partners/${partnerId}/interactions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    })
+    if (!res.ok) throw new Error((await res.json()).error)
+    const data = await res.json()
+    const interaction = data.interaction ?? data
+    set((s) => ({
+      byLead: { ...s.byLead, [partnerId]: [interaction, ...(s.byLead[partnerId] ?? [])] },
+    }))
+    return { interaction, stageAdvanced: data.stageAdvanced ?? false, newStage: data.newStage ?? null, updatedPartner: data.updatedPartner ?? null }
+  },
 }))

@@ -5,6 +5,7 @@ import dayjs from 'dayjs'
 import { Button } from '@/components/ui/button'
 import { useInteractionStore } from '@/store/interactionStore'
 import { useLeadStore } from '@/store/leadStore'
+import { usePartnerStore } from '@/store/partnerStore'
 import toast from 'react-hot-toast'
 
 /* ── Method config (how the interaction happened) ── */
@@ -75,12 +76,19 @@ const EMPTY_FORM = {
 }
 
 /* ── Add Interaction Form ── */
-function AddInteractionForm({ leadId, leadStage, onAdded }) {
+function AddInteractionForm({ leadId, leadStage, partnerId, onAdded }) {
+  const isPartner = !!partnerId
+  const subjectId = partnerId ?? leadId
   const [open, setOpen] = useState(false)
   const [form, setForm] = useState(EMPTY_FORM)
   const [saving, setSaving] = useState(false)
-  const { createInteraction } = useInteractionStore()
+  const { createInteraction, createPartnerInteraction } = useInteractionStore()
   const { advanceLeadStage, updateLeadLocal } = useLeadStore()
+  const { advancePartnerStage, updatePartnerLocal } = usePartnerStore()
+
+  const noun = isPartner ? 'partnership' : 'lead'
+  const pipelineLabel = isPartner ? 'Negotiating' : 'Sales Pipeline'
+  const activeLabel   = isPartner ? 'Active' : 'Post-Sales'
 
   const methods  = METHODS_BY_STAGE[leadStage]  ?? METHODS_BY_STAGE['pre-sales']
   const outcomes = OUTCOMES_BY_STAGE[leadStage] ?? OUTCOMES_BY_STAGE['pre-sales']
@@ -97,8 +105,7 @@ function AddInteractionForm({ leadId, leadStage, onAdded }) {
     if (!form.outcome)    { toast.error('Select an outcome'); return }
     setSaving(true)
     try {
-      const { stageAdvanced, newStage, updatedLead } = await createInteraction({
-        leadId,
+      const payload = {
         method: form.method,
         outcome: form.outcome,
         date: form.date,
@@ -107,19 +114,31 @@ function AddInteractionForm({ leadId, leadStage, onAdded }) {
         mom: form.mom.trim(),
         nextFollowUpDate: form.nextFollowUpDate || undefined,
         nextFollowUpTime: form.nextFollowUpTime || undefined,
-      })
+      }
+
+      const result = isPartner
+        ? await createPartnerInteraction(subjectId, payload)
+        : await createInteraction({ leadId: subjectId, ...payload })
+      const { stageAdvanced, newStage } = result
+      const updatedSubject = isPartner ? result.updatedPartner : result.updatedLead
+
       setOpen(false)
       setForm(EMPTY_FORM)
 
-      // Apply lead changes locally (outcome, followUpDate, stage)
-      if (updatedLead) updateLeadLocal(leadId, updatedLead)
+      // Apply subject changes locally (outcome, followUpDate, stage)
+      if (updatedSubject) {
+        if (isPartner) updatePartnerLocal(subjectId, updatedSubject)
+        else updateLeadLocal(subjectId, updatedSubject)
+      }
 
       if (stageAdvanced && newStage === 'sales-pipeline') {
-        advanceLeadStage(leadId, 'sales-pipeline')
-        toast.success('Demo scheduled — lead moved to Sales Pipeline')
+        if (isPartner) advancePartnerStage(subjectId, 'sales-pipeline')
+        else advanceLeadStage(subjectId, 'sales-pipeline')
+        toast.success(`Demo scheduled — ${noun} moved to ${pipelineLabel}`)
       } else if (stageAdvanced && newStage === 'post-sales') {
-        advanceLeadStage(leadId, 'post-sales')
-        toast.success('Marked as Paid — lead moved to Post-Sales')
+        if (isPartner) advancePartnerStage(subjectId, 'post-sales')
+        else advanceLeadStage(subjectId, 'post-sales')
+        toast.success(`Marked as Paid — ${noun} moved to ${activeLabel}`)
       } else {
         const followUpMsg = form.nextFollowUpDate
           ? ` · Follow-up set for ${dayjs(form.nextFollowUpDate).format('D MMM')}`
@@ -198,12 +217,12 @@ function AddInteractionForm({ leadId, leadStage, onAdded }) {
               </div>
               {leadStage === 'pre-sales' && form.outcome === 'demo-scheduled' && (
                 <p className="text-[11px] text-[#3B82F6] bg-[#3B82F6]/8 border border-[#3B82F6]/20 rounded px-2.5 py-1.5 mt-2">
-                  Marking as <strong>Demo Scheduled</strong> will move this lead to Sales Pipeline.
+                  Marking as <strong>Demo Scheduled</strong> will move this {noun} to {pipelineLabel}.
                 </p>
               )}
               {leadStage === 'sales-pipeline' && form.outcome === 'paid' && (
                 <p className="text-[11px] text-[#22C55E] bg-[#22C55E]/8 border border-[#22C55E]/20 rounded px-2.5 py-1.5 mt-2">
-                  Marking as <strong>Paid</strong> will move this lead to Post-Sales.
+                  Marking as <strong>Paid</strong> will move this {noun} to {activeLabel}.
                 </p>
               )}
             </div>
@@ -364,18 +383,25 @@ function InteractionEntry({ interaction }) {
 }
 
 /* ── Main InteractionLog panel ── */
-export default function InteractionLog({ leadId, leadStage }) {
-  const { byLead, loading, fetchInteractions } = useInteractionStore()
-  const interactions = byLead[leadId] ?? null
+export default function InteractionLog({ leadId, leadStage, partnerId }) {
+  const isPartner = !!partnerId
+  const subjectId = partnerId ?? leadId
+  const { byLead, loading, fetchInteractions, fetchPartnerInteractions } = useInteractionStore()
+  const interactions = byLead[subjectId] ?? null
+
+  const refetch = () => {
+    if (isPartner) fetchPartnerInteractions(subjectId)
+    else fetchInteractions(subjectId)
+  }
 
   useEffect(() => {
-    if (leadId) fetchInteractions(leadId)
-  }, [leadId])
+    if (subjectId) refetch()
+  }, [subjectId])
 
   return (
     <div className="h-full flex flex-col">
       <div className="flex-1 overflow-y-auto px-5 py-3">
-        <AddInteractionForm leadId={leadId} leadStage={leadStage} onAdded={() => fetchInteractions(leadId)} />
+        <AddInteractionForm leadId={leadId} leadStage={leadStage} partnerId={partnerId} onAdded={refetch} />
 
         {loading && !interactions && (
           <div className="flex items-center gap-2 text-[#666] text-xs py-4">

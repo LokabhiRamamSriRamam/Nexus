@@ -11,7 +11,8 @@ const leadSchema = new mongoose.Schema(
     internalPOC: { type: String, trim: true },
     zone: { type: mongoose.Schema.Types.ObjectId, ref: 'Zone' },
     priority: { type: String, enum: ['P0', 'P1', 'P2', 'P3', 'P4'], default: 'P2' },
-    source: { type: String, enum: ['call', 'mail', 'referral', 'walk-in', 'other'], default: 'call' },
+    source: { type: String, enum: ['call', 'mail', 'referral', 'walk-in', 'partnership', 'other'], default: 'call' },
+    partnerId: { type: mongoose.Schema.Types.ObjectId, ref: 'Partner' }, // which partner sourced this lead
     outcome: {
       type: String,
       enum: [

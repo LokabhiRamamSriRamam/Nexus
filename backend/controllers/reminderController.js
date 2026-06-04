@@ -8,7 +8,9 @@ export const getTodayReminders = async (req, res) => {
     const reminders = await Reminder.find({
       reminderDate: { $gte: start, $lte: end },
       status: 'pending',
-    }).populate('leadId', 'businessName phone clientPOC internalPOC priority')
+    })
+      .populate('leadId', 'businessName phone clientPOC internalPOC priority')
+      .populate('partnerId', 'businessName contactName phone priority')
     res.json(reminders)
   } catch (err) {
     res.status(500).json({ error: err.message })
@@ -24,6 +26,7 @@ export const getUpcomingReminders = async (req, res) => {
       status: 'pending',
     })
       .populate('leadId', 'businessName phone clientPOC internalPOC priority')
+      .populate('partnerId', 'businessName contactName phone priority')
       .sort({ reminderDate: 1 })
     res.json(reminders)
   } catch (err) {

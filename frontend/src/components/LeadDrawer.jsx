@@ -21,7 +21,7 @@ const PRIORITY_STYLES = {
 }
 
 const SOURCE_LABELS = {
-  call: 'Call', mail: 'Mail', referral: 'Referral', 'walk-in': 'Walk-in', other: 'Other',
+  call: 'Call', mail: 'Mail', referral: 'Referral', 'walk-in': 'Walk-in', partnership: 'Partnership', other: 'Other',
 }
 
 const STAGE_LABELS = {
@@ -191,6 +191,8 @@ export default function LeadDrawer() {
                   {selectedLead.source && (
                     <span className="text-[10px] text-[#555]">
                       via {SOURCE_LABELS[selectedLead.source] ?? selectedLead.source}
+                      {selectedLead.source === 'partnership' && selectedLead.partnerId?.businessName
+                        ? `: ${selectedLead.partnerId.businessName}` : ''}
                     </span>
                   )}
                   <span className="text-[10px] text-[#666] px-1.5 py-0.5 rounded bg-[#1a1a1a] border border-[#2a2a2a]">

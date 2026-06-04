@@ -20,6 +20,7 @@ export const getLeads = async (req, res) => {
     const leads = await Lead.find(filter)
       .populate('zone', 'name')
       .populate('referredBy', 'businessName')
+      .populate('partnerId', 'businessName')
       .sort({ createdAt: -1 })
     res.json(leads)
   } catch (err) {
@@ -48,6 +49,7 @@ export const updateLead = async (req, res) => {
     const lead = await Lead.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true })
       .populate('zone', 'name')
       .populate('referredBy', 'businessName')
+      .populate('partnerId', 'businessName')
     if (!lead) return res.status(404).json({ error: 'Lead not found' })
 
     if (req.body.followUpDate) {
