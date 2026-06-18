@@ -2,7 +2,7 @@ import type { CapacitorConfig } from '@capacitor/cli'
 
 const config: CapacitorConfig = {
   appId:   'com.nexus.crm',
-  appName: 'Nexus CRM',
+  appName: 'Nexus by Connect',
   webDir:  'dist',
 
   server: {

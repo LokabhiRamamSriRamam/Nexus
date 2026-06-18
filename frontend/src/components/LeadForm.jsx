@@ -8,11 +8,27 @@ import { Button } from '@/components/ui/button'
 import { useLeadStore } from '@/store/leadStore'
 import { useZoneStore } from '@/store/zoneStore'
 import { useSalesRepStore } from '@/store/salesRepStore'
+import { useInteractionStore } from '@/store/interactionStore'
 import DatePicker from '@/components/ui/DatePicker'
 import dayjs from 'dayjs'
 import toast from 'react-hot-toast'
 
-const STEPS = ['Business Info', 'Contact & POC', 'Classification', 'Follow-up']
+const STEPS_CREATE = ['Business Info', 'Contact & POC', 'Classification', 'Follow-up', 'First Contact']
+const STEPS_EDIT   = ['Business Info', 'Contact & POC', 'Classification', 'Follow-up']
+
+/* Pre-sales method/outcome config for the First Contact step */
+const INT_METHODS = [
+  { t: 'call',     label: 'Call',     color: '#3B82F6' },
+  { t: 'email',    label: 'Email',    color: '#22C55E' },
+  { t: 'whatsapp', label: 'WhatsApp', color: '#25D366' },
+  { t: 'walk-in',  label: 'Walk-in',  color: '#F59E0B' },
+]
+const INT_OUTCOMES = {
+  'call':     [{ t: 'call-made', label: 'Call Made', color: '#3B82F6' }, { t: 'call-not-picked', label: 'Not Picked', color: '#FF4444' }, { t: 'follow-up-scheduled', label: 'Follow-up Set', color: '#FF8C00' }, { t: 'demo-scheduled', label: 'Demo Scheduled', color: '#E8FF47' }, { t: 'not-interested', label: 'Not Interested', color: '#FF4444' }],
+  'email':    [{ t: 'email-sent', label: 'Email Sent', color: '#22C55E' }, { t: 'email-replied', label: 'Email Replied', color: '#10B981' }, { t: 'follow-up-scheduled', label: 'Follow-up Set', color: '#FF8C00' }, { t: 'demo-scheduled', label: 'Demo Scheduled', color: '#E8FF47' }, { t: 'not-interested', label: 'Not Interested', color: '#FF4444' }],
+  'whatsapp': [{ t: 'message-sent', label: 'Message Sent', color: '#25D366' }, { t: 'message-replied', label: 'Msg Replied', color: '#059669' }, { t: 'follow-up-scheduled', label: 'Follow-up Set', color: '#FF8C00' }, { t: 'demo-scheduled', label: 'Demo Scheduled', color: '#E8FF47' }, { t: 'not-interested', label: 'Not Interested', color: '#FF4444' }],
+  'walk-in':  [{ t: 'walked-in', label: 'Walked In', color: '#F59E0B' }, { t: 'follow-up-scheduled', label: 'Follow-up Set', color: '#FF8C00' }, { t: 'demo-scheduled', label: 'Demo Scheduled', color: '#E8FF47' }, { t: 'not-interested', label: 'Not Interested', color: '#FF4444' }],
+}
 
 const COUNTRY_CODES = [
   { code: '+91',  label: 'IN +91'  },
@@ -60,17 +76,24 @@ const EMPTY = {
   followUpDate: '',
   followUpTime: '',
   notes: '',
+  intMethod: 'call',
+  intOutcome: 'call-made',
+  intNotes: '',
 }
 
 export default function LeadForm() {
   const { modalOpen, editingLead, setModalOpen, createLead, updateLead } = useLeadStore()
   const { zones, fetchZones } = useZoneStore()
   const { reps, fetchReps } = useSalesRepStore()
+  const { createInteraction } = useInteractionStore()
   const [step, setStep] = useState(0)
   const [form, setFormState] = useState(EMPTY)
   const [submitting, setSubmitting] = useState(false)
   const [errors, setErrors] = useState({})
   const [partners, setPartners] = useState([])
+
+  const isCreating = !editingLead
+  const STEPS = isCreating ? STEPS_CREATE : STEPS_EDIT
 
   const setField = (key, value) => setFormState((f) => ({ ...f, [key]: value }))
 
@@ -134,22 +157,37 @@ export default function LeadForm() {
     setSubmitting(true)
     try {
       const payload = { ...form }
-      // Combine country code + phone into one field
       payload.phone = form.phone.trim() ? `${form.countryCode} ${form.phone.trim()}` : ''
       delete payload.countryCode
+      delete payload.intMethod
+      delete payload.intOutcome
+      delete payload.intNotes
       if (!payload.zone)         delete payload.zone
       if (!payload.followUpDate) delete payload.followUpDate
       if (!payload.followUpTime) delete payload.followUpTime
       if (!payload.phone)        delete payload.phone
-      // Only attribute to a partner when source is partnership
       if (payload.source !== 'partnership' || !payload.partnerId) delete payload.partnerId
 
       if (editingLead) {
         await updateLead(editingLead._id, payload)
         toast.success('Lead updated')
       } else {
-        await createLead(payload)
-        toast.success('Lead created')
+        const lead = await createLead(payload)
+        if (form.intNotes.trim()) {
+          try {
+            await createInteraction({
+              leadId:  lead._id,
+              method:  form.intMethod,
+              outcome: form.intOutcome,
+              date:    dayjs().format('YYYY-MM-DD'),
+              time:    dayjs().format('HH:mm'),
+              mom:     form.intNotes.trim(),
+            })
+          } catch {
+            // interaction failure shouldn't block lead creation success
+          }
+        }
+        toast.success('Lead created' + (form.intNotes.trim() ? ' · interaction logged' : ''))
       }
       setModalOpen(false)
     } catch (err) {
@@ -196,6 +234,7 @@ export default function LeadForm() {
             {step === 1 && <StepContact form={form} setField={setField} reps={reps} />}
             {step === 2 && <StepClassify form={form} setField={setField} zones={zones} partners={partners} />}
             {step === 3 && <StepFollowUp form={form} setField={setField} />}
+            {step === 4 && <StepFirstContact form={form} setField={setField} />}
           </motion.div>
         </AnimatePresence>
 
@@ -218,14 +257,27 @@ export default function LeadForm() {
               Next <ChevronRight size={11} className="ml-1" />
             </Button>
           ) : (
-            <Button
-              size="sm"
-              onClick={submit}
-              disabled={submitting}
-              className="bg-accent text-background hover:bg-accent/90 text-xs font-semibold h-7 px-4"
-            >
-              {submitting ? 'Saving…' : editingLead ? 'Update Lead' : 'Create Lead'}
-            </Button>
+            <div className="flex items-center gap-2">
+              {isCreating && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={submit}
+                  disabled={submitting}
+                  className="text-text-secondary hover:text-text-primary text-xs h-7"
+                >
+                  Skip
+                </Button>
+              )}
+              <Button
+                size="sm"
+                onClick={submit}
+                disabled={submitting}
+                className="bg-accent text-background hover:bg-accent/90 text-xs font-semibold h-7 px-4"
+              >
+                {submitting ? 'Saving…' : editingLead ? 'Update Lead' : form.intNotes.trim() ? 'Create + Log' : 'Create Lead'}
+              </Button>
+            </div>
           )}
         </div>
       </DialogContent>
@@ -428,6 +480,79 @@ function StepClassify({ form, setField, zones, partners = [] }) {
           )}
         </Field>
       )}
+    </StepCard>
+  )
+}
+
+/* ── Step 5: First Contact (create-only, optional) ── */
+function StepFirstContact({ form, setField }) {
+  const outcomes = INT_OUTCOMES[form.intMethod] ?? INT_OUTCOMES['call']
+
+  const handleMethodChange = (m) => {
+    setField('intMethod', m)
+    setField('intOutcome', (INT_OUTCOMES[m] ?? INT_OUTCOMES['call'])[0].t)
+  }
+
+  return (
+    <StepCard>
+      <p className="text-[11px] text-text-muted -mt-1">
+        Optional — fill in notes to log this as the lead's first interaction.
+      </p>
+
+      <div>
+        <Label className="text-[#aaaaaa] text-[11px] font-medium tracking-wide">Method</Label>
+        <div className="flex gap-1.5 flex-wrap mt-1.5">
+          {INT_METHODS.map(({ t, label, color }) => {
+            const active = form.intMethod === t
+            return (
+              <button
+                key={t}
+                type="button"
+                onClick={() => handleMethodChange(t)}
+                style={active ? { color, borderColor: color + '60', backgroundColor: color + '18' } : {}}
+                className={`px-2.5 py-1 rounded text-xs border transition-all ${
+                  active ? '' : 'border-[#2e2e2e] text-[#666] hover:border-[#444] hover:text-[#aaa]'
+                }`}
+              >
+                {label}
+              </button>
+            )
+          })}
+        </div>
+      </div>
+
+      <div>
+        <Label className="text-[#aaaaaa] text-[11px] font-medium tracking-wide">Outcome</Label>
+        <div className="flex gap-1.5 flex-wrap mt-1.5">
+          {outcomes.map(({ t, label, color }) => {
+            const active = form.intOutcome === t
+            return (
+              <button
+                key={t}
+                type="button"
+                onClick={() => setField('intOutcome', t)}
+                style={active ? { color, borderColor: color + '60', backgroundColor: color + '18' } : {}}
+                className={`px-2.5 py-1 rounded text-xs border transition-all ${
+                  active ? '' : 'border-[#2e2e2e] text-[#666] hover:border-[#444] hover:text-[#aaa]'
+                }`}
+              >
+                {label}
+              </button>
+            )
+          })}
+        </div>
+      </div>
+
+      <Field label="Notes">
+        <textarea
+          value={form.intNotes}
+          onChange={(e) => setField('intNotes', e.target.value)}
+          placeholder="What happened? Key details, next steps… (leave blank to skip)"
+          rows={3}
+          className={textareaCls}
+          autoFocus
+        />
+      </Field>
     </StepCard>
   )
 }

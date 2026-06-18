@@ -14,6 +14,7 @@ import { useAuthStore } from '@/store/authStore'
 import Dashboard    from '@/pages/Dashboard'
 import PreSales     from '@/pages/PreSales'
 import SalesPipeline from '@/pages/SalesPipeline'
+import FreeTrial    from '@/pages/FreeTrial'
 import PostSales    from '@/pages/PostSales'
 import Partnerships from '@/pages/Partnerships'
 import Settings     from '@/pages/Settings'
@@ -61,6 +62,7 @@ const router = createBrowserRouter([
       { path: '/',                element: <Dashboard /> },
       { path: '/pre-sales',       element: <PreSales /> },
       { path: '/sales-pipeline',  element: <SalesPipeline /> },
+      { path: '/free-trial',      element: <FreeTrial /> },
       { path: '/post-sales',      element: <PostSales /> },
       { path: '/partnerships',    element: <Partnerships /> },
       { path: '/settings',        element: <Settings /> },

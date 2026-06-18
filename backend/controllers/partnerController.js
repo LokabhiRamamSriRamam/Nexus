@@ -32,6 +32,16 @@ export const getPartners = async (req, res) => {
   }
 }
 
+export const getPartner = async (req, res) => {
+  try {
+    const partner = await Partner.findById(req.params.id).populate('zone', 'name')
+    if (!partner) return res.status(404).json({ error: 'Partner not found' })
+    res.json(partner)
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+}
+
 // Active partners only — used for the lead attribution picker
 export const getActivePartners = async (_req, res) => {
   try {

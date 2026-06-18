@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import {
   getPartners,
+  getPartner,
   getActivePartners,
   createPartner,
   updatePartner,
@@ -17,6 +18,7 @@ const router = Router()
 router.get('/', getPartners)
 router.get('/active', getActivePartners)
 router.get('/analytics', getPartnerAnalytics)
+router.get('/:id', getPartner)
 router.post('/', createPartner)
 router.put('/:id', updatePartner)
 router.delete('/:id', deletePartner)

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Plus, Phone, Mail, MessageSquare, Video, Users, MoreHorizontal, Loader2 } from 'lucide-react'
+import { Plus, Phone, Mail, MessageSquare, Video, Users, DoorOpen, MoreHorizontal, Loader2, Skull } from 'lucide-react'
 import dayjs from 'dayjs'
 import { Button } from '@/components/ui/button'
 import { useInteractionStore } from '@/store/interactionStore'
@@ -8,45 +8,75 @@ import { useLeadStore } from '@/store/leadStore'
 import { usePartnerStore } from '@/store/partnerStore'
 import toast from 'react-hot-toast'
 
-/* ── Method config (how the interaction happened) ── */
+/* ── Method config ── */
 const METHOD_CONFIG = {
-  call:        { label: 'Call',        icon: Phone,        color: '#3B82F6' },
-  email:       { label: 'Email',       icon: Mail,         color: '#22C55E' },
-  whatsapp:    { label: 'WhatsApp',    icon: MessageSquare, color: '#25D366' },
-  'google-meet': { label: 'Google Meet', icon: Video,      color: '#EA4335' },
-  'in-person': { label: 'In-Person',  icon: Users,        color: '#A855F7' },
-  other:       { label: 'Other',       icon: MoreHorizontal, color: '#888888' },
+  call:           { label: 'Call',        icon: Phone,          color: '#3B82F6' },
+  email:          { label: 'Email',       icon: Mail,           color: '#22C55E' },
+  whatsapp:       { label: 'WhatsApp',    icon: MessageSquare,  color: '#25D366' },
+  'walk-in':      { label: 'Walk-in',     icon: DoorOpen,       color: '#F59E0B' },
+  'google-meet':  { label: 'Google Meet', icon: Video,          color: '#EA4335' },
+  'in-person':    { label: 'In-Person',   icon: Users,          color: '#A855F7' },
+  other:          { label: 'Other',       icon: MoreHorizontal, color: '#888888' },
 }
 
-/* Stage-specific method options */
 const METHODS_BY_STAGE = {
-  'pre-sales':      ['call', 'email', 'whatsapp'],
+  'pre-sales':      ['call', 'email', 'whatsapp', 'walk-in'],
+  'free-trial':     ['call', 'email', 'whatsapp', 'walk-in'],
   'sales-pipeline': ['call', 'google-meet', 'in-person', 'email', 'other'],
   'post-sales':     ['call', 'google-meet', 'in-person', 'email', 'other'],
 }
 
 /* ── Outcome config ── */
 const OUTCOME_CONFIG = {
-  'fresh-lead':        { label: 'Fresh Lead',        color: '#888888' },
-  'call-made':         { label: 'Call Made',          color: '#3B82F6' },
-  'call-not-picked':   { label: 'Not Picked',         color: '#FF4444' },
+  'fresh-lead':       { label: 'Fresh Lead',        color: '#888888' },
+  'call-made':        { label: 'Call Made',          color: '#3B82F6' },
+  'call-not-picked':  { label: 'Not Picked',         color: '#FF4444' },
+  'email-sent':       { label: 'Email Sent',         color: '#22C55E' },
+  'email-replied':    { label: 'Email Replied',      color: '#10B981' },
+  'message-sent':     { label: 'Message Sent',       color: '#25D366' },
+  'message-replied':  { label: 'Msg Replied',        color: '#059669' },
+  'walked-in':        { label: 'Walked In',          color: '#F59E0B' },
   'follow-up-scheduled': { label: 'Follow-up Scheduled', color: '#FF8C00' },
-  'demo-scheduled':    { label: 'Demo Scheduled',     color: '#E8FF47' },
-  'follow-up-needed':  { label: 'Follow-up Needed',   color: '#FF8C00' },
-  'interested':        { label: 'Interested',          color: '#22C55E' },
-  'not-interested':    { label: 'Not Interested',      color: '#FF4444' },
-  'negotiation':       { label: 'Negotiation',         color: '#A855F7' },
-  'deal-sent':         { label: 'Deal Sent',           color: '#3B82F6' },
-  'paid':              { label: 'Paid',                color: '#22C55E' },
+  'demo-scheduled':   { label: 'Demo Scheduled',     color: '#E8FF47' },
+  'follow-up-needed': { label: 'Follow-up Needed',   color: '#FF8C00' },
+  'interested':       { label: 'Interested',          color: '#22C55E' },
+  'not-interested':   { label: 'Not Interested',      color: '#FF4444' },
+  'negotiation':      { label: 'Negotiation',         color: '#A855F7' },
+  'deal-sent':        { label: 'Deal Sent',           color: '#3B82F6' },
+  'paid':             { label: 'Paid',                color: '#22C55E' },
   'renewal-discussion': { label: 'Renewal Discussion', color: '#3B82F6' },
   'renewal-confirmed':  { label: 'Renewal Confirmed',  color: '#22C55E' },
   'churned':            { label: 'Churned',            color: '#FF4444' },
 }
 
-const OUTCOMES_BY_STAGE = {
-  'pre-sales':      ['call-made', 'call-not-picked', 'follow-up-scheduled', 'demo-scheduled'],
-  'sales-pipeline': ['follow-up-needed', 'interested', 'not-interested', 'negotiation', 'demo-scheduled', 'deal-sent', 'paid'],
-  'post-sales':     ['renewal-discussion', 'renewal-confirmed', 'churned'],
+/* Outcomes keyed by stage → method */
+const OUTCOMES_BY_METHOD = {
+  'pre-sales': {
+    'call':     ['call-made', 'call-not-picked', 'follow-up-scheduled', 'demo-scheduled', 'not-interested'],
+    'email':    ['email-sent', 'email-replied', 'follow-up-scheduled', 'demo-scheduled', 'not-interested'],
+    'whatsapp': ['message-sent', 'message-replied', 'follow-up-scheduled', 'demo-scheduled', 'not-interested'],
+    'walk-in':  ['walked-in', 'follow-up-scheduled', 'demo-scheduled', 'not-interested'],
+  },
+  'free-trial': {
+    'call':     ['call-made', 'call-not-picked', 'follow-up-scheduled', 'not-interested'],
+    'email':    ['email-sent', 'email-replied', 'follow-up-scheduled', 'not-interested'],
+    'whatsapp': ['message-sent', 'message-replied', 'follow-up-scheduled', 'not-interested'],
+    'walk-in':  ['walked-in', 'follow-up-scheduled', 'not-interested'],
+  },
+  'sales-pipeline': {
+    'call':        ['call-made', 'call-not-picked', 'follow-up-needed', 'interested', 'negotiation', 'deal-sent', 'paid', 'not-interested'],
+    'google-meet': ['follow-up-needed', 'interested', 'negotiation', 'deal-sent', 'paid', 'not-interested'],
+    'in-person':   ['walked-in', 'follow-up-needed', 'interested', 'negotiation', 'deal-sent', 'paid', 'not-interested'],
+    'email':       ['email-sent', 'email-replied', 'follow-up-needed', 'deal-sent', 'paid', 'not-interested'],
+    'other':       ['follow-up-needed', 'interested', 'negotiation', 'paid', 'not-interested'],
+  },
+  'post-sales': {
+    'call':        ['renewal-discussion', 'renewal-confirmed', 'follow-up-needed', 'churned'],
+    'google-meet': ['renewal-discussion', 'renewal-confirmed', 'follow-up-needed', 'churned'],
+    'in-person':   ['renewal-discussion', 'renewal-confirmed', 'follow-up-needed', 'churned'],
+    'email':       ['email-sent', 'email-replied', 'renewal-discussion', 'renewal-confirmed'],
+    'other':       ['renewal-discussion', 'renewal-confirmed', 'churned'],
+  },
 }
 
 /* Half-hour time slots 6 AM – 10 PM */
@@ -82,22 +112,45 @@ function AddInteractionForm({ leadId, leadStage, partnerId, onAdded }) {
   const [open, setOpen] = useState(false)
   const [form, setForm] = useState(EMPTY_FORM)
   const [saving, setSaving] = useState(false)
+  const [markingLost, setMarkingLost] = useState(false)
   const { createInteraction, createPartnerInteraction } = useInteractionStore()
-  const { advanceLeadStage, updateLeadLocal } = useLeadStore()
+  const { advanceLeadStage, updateLeadLocal, updateStage } = useLeadStore()
   const { advancePartnerStage, updatePartnerLocal } = usePartnerStore()
 
   const noun = isPartner ? 'partnership' : 'lead'
   const pipelineLabel = isPartner ? 'Negotiating' : 'Sales Pipeline'
   const activeLabel   = isPartner ? 'Active' : 'Post-Sales'
+  const canMarkLost   = !isPartner && ['pre-sales', 'sales-pipeline', 'free-trial'].includes(leadStage)
 
   const methods  = METHODS_BY_STAGE[leadStage]  ?? METHODS_BY_STAGE['pre-sales']
-  const outcomes = OUTCOMES_BY_STAGE[leadStage] ?? OUTCOMES_BY_STAGE['pre-sales']
+  const getOutcomes = (method) => OUTCOMES_BY_METHOD[leadStage]?.[method] ?? OUTCOMES_BY_METHOD['pre-sales']?.['call'] ?? []
 
   const setField = (k, v) => setForm((f) => ({ ...f, [k]: v }))
 
+  const handleMethodChange = (m) => {
+    const newOutcomes = getOutcomes(m)
+    setForm((f) => ({ ...f, method: m, outcome: newOutcomes[0] ?? '' }))
+  }
+
   const openForm = () => {
-    setForm({ ...EMPTY_FORM, method: methods[0], outcome: outcomes[0] })
+    const defaultMethod  = methods[0]
+    const defaultOutcome = getOutcomes(defaultMethod)[0] ?? ''
+    setForm({ ...EMPTY_FORM, method: defaultMethod, outcome: defaultOutcome })
     setOpen(true)
+  }
+
+  const handleMarkLost = async () => {
+    if (!window.confirm('Mark this lead as a Dead End / Lost? This will move it out of the active pipeline.')) return
+    setMarkingLost(true)
+    try {
+      await updateStage(leadId, 'lost')
+      setOpen(false)
+      toast.success('Lead marked as Dead End')
+    } catch {
+      toast.error('Failed to update stage')
+    } finally {
+      setMarkingLost(false)
+    }
   }
 
   const submit = async () => {
@@ -181,7 +234,7 @@ function AddInteractionForm({ leadId, leadStage, partnerId, onAdded }) {
                   return (
                     <button
                       key={m}
-                      onClick={() => setField('method', m)}
+                      onClick={() => handleMethodChange(m)}
                       style={active ? { color: cfg.color, borderColor: cfg.color + '60', backgroundColor: cfg.color + '18' } : {}}
                       className={`px-2.5 py-1 rounded text-xs border capitalize transition-all ${
                         active ? '' : 'border-[#2a2a2a] text-[#666] hover:border-[#3a3a3a] hover:text-[#aaa]'
@@ -198,8 +251,9 @@ function AddInteractionForm({ leadId, leadStage, partnerId, onAdded }) {
             <div>
               <p className="text-[10px] text-[#555] mb-1.5 uppercase tracking-wider">Outcome</p>
               <div className="flex gap-1.5 flex-wrap">
-                {outcomes.map((o) => {
+                {getOutcomes(form.method).map((o) => {
                   const cfg = OUTCOME_CONFIG[o]
+                  if (!cfg) return null
                   const active = form.outcome === o
                   return (
                     <button
@@ -215,7 +269,7 @@ function AddInteractionForm({ leadId, leadStage, partnerId, onAdded }) {
                   )
                 })}
               </div>
-              {leadStage === 'pre-sales' && form.outcome === 'demo-scheduled' && (
+              {['pre-sales', 'free-trial'].includes(leadStage) && form.outcome === 'demo-scheduled' && (
                 <p className="text-[11px] text-[#3B82F6] bg-[#3B82F6]/8 border border-[#3B82F6]/20 rounded px-2.5 py-1.5 mt-2">
                   Marking as <strong>Demo Scheduled</strong> will move this {noun} to {pipelineLabel}.
                 </p>
@@ -298,10 +352,22 @@ function AddInteractionForm({ leadId, leadStage, partnerId, onAdded }) {
               </div>
             </div>
 
-            <div className="flex items-center justify-between">
-              <button onClick={() => setOpen(false)} className="text-xs text-[#666] hover:text-[#aaa] transition-colors">
-                Cancel
-              </button>
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <button onClick={() => setOpen(false)} className="text-xs text-[#666] hover:text-[#aaa] transition-colors">
+                  Cancel
+                </button>
+                {canMarkLost && (
+                  <button
+                    onClick={handleMarkLost}
+                    disabled={markingLost}
+                    className="flex items-center gap-1 text-xs text-[#555] hover:text-p0 transition-colors disabled:opacity-40"
+                  >
+                    {markingLost ? <Loader2 size={10} className="animate-spin" /> : <Skull size={10} />}
+                    Dead End
+                  </button>
+                )}
+              </div>
               <Button
                 size="sm"
                 onClick={submit}

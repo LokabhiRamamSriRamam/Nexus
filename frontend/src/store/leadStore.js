@@ -96,13 +96,18 @@ export const useLeadStore = create((set, get) => ({
     }))
   },
 
-  updateStage: async (id, stage) => {
+  updateStage: async (id, stage, extras = {}) => {
     const res = await fetch(`/api/leads/${id}/stage`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ stage }),
+      body: JSON.stringify({ stage, ...extras }),
     })
     if (!res.ok) throw new Error((await res.json()).error)
-    set((s) => ({ leads: s.leads.filter((l) => l._id !== id) }))
+    const lead = await res.json()
+    set((s) => ({
+      leads: s.leads.filter((l) => l._id !== id),
+      selectedLead: s.selectedLead?._id === id ? lead : s.selectedLead,
+    }))
+    return lead
   },
 }))

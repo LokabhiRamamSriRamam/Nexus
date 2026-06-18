@@ -6,6 +6,10 @@ import {
 } from 'lucide-react'
 import dayjs from 'dayjs'
 import { useSalesRepStore } from '@/store/salesRepStore'
+import { useLeadStore } from '@/store/leadStore'
+import { usePartnerStore } from '@/store/partnerStore'
+import LeadDrawer from '@/components/LeadDrawer'
+import PartnerDrawer from '@/components/PartnerDrawer'
 
 const PRIORITY_CLS = {
   P0: 'bg-p0/10 text-p0 border-p0/30',
@@ -47,9 +51,15 @@ async function fetchAgenda(rep, range) {
 }
 
 /* ── Single action row ── */
-function ActionItem({ item, showDate = true }) {
+function ActionItem({ item, showDate = true, onOpen, loading }) {
   return (
-    <div className="flex items-center gap-2.5 px-3 py-2.5 border-b border-[#1c1c1c] last:border-0 hover:bg-[#161616] transition-colors">
+    <button
+      onClick={() => item.subjectId && onOpen?.(item)}
+      disabled={loading}
+      className={`w-full text-left flex items-center gap-2.5 px-3 py-2.5 border-b border-[#1c1c1c] last:border-0 transition-colors ${
+        item.subjectId ? 'hover:bg-[#1a1a1a] cursor-pointer' : 'cursor-default'
+      } ${loading ? 'opacity-60' : ''}`}
+    >
       {item.priority && (
         <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border shrink-0 ${PRIORITY_CLS[item.priority] ?? PRIORITY_CLS.P2}`}>
           {item.priority}
@@ -70,10 +80,15 @@ function ActionItem({ item, showDate = true }) {
         </span>
       )}
       <span className="text-right shrink-0 w-14">
-        <span className="block text-[#999] text-[11px] font-mono">{item.time || '—'}</span>
-        {showDate && <span className="block text-[#555] text-[10px] font-mono">{dayjs(item.date).format('D MMM')}</span>}
+        {loading
+          ? <Loader2 size={11} className="animate-spin text-accent ml-auto" />
+          : <>
+              <span className="block text-[#999] text-[11px] font-mono">{item.time || '—'}</span>
+              {showDate && <span className="block text-[#555] text-[10px] font-mono">{dayjs(item.date).format('D MMM')}</span>}
+            </>
+        }
       </span>
-    </div>
+    </button>
   )
 }
 
@@ -95,7 +110,7 @@ function EmptyState({ text }) {
 }
 
 /* ── List view (overdue / today / this week / upcoming) ── */
-function ListPane({ rep, scope, emptyText, groupByDate }) {
+function ListPane({ rep, scope, emptyText, groupByDate, onItemClick, loadingId }) {
   const [items, setItems] = useState(null)
 
   useEffect(() => {
@@ -113,7 +128,9 @@ function ListPane({ rep, scope, emptyText, groupByDate }) {
   if (!groupByDate) {
     return (
       <div className="bg-[#0d0d0d] border border-[#1f1f1f] rounded-lg overflow-hidden">
-        {items.map((it) => <ActionItem key={it.id} item={it} showDate={false} />)}
+        {items.map((it) => (
+          <ActionItem key={it.id} item={it} showDate={false} onOpen={onItemClick} loading={loadingId === String(it.id)} />
+        ))}
       </div>
     )
   }
@@ -142,7 +159,9 @@ function ListPane({ rep, scope, emptyText, groupByDate }) {
               <span className="text-[#444] text-[11px] ml-auto">{byDay[k].length}</span>
             </div>
             <div className="bg-[#0d0d0d] border border-[#1f1f1f] rounded-lg overflow-hidden">
-              {byDay[k].map((it) => <ActionItem key={it.id} item={it} showDate={false} />)}
+              {byDay[k].map((it) => (
+                <ActionItem key={it.id} item={it} showDate={false} onOpen={onItemClick} loading={loadingId === String(it.id)} />
+              ))}
             </div>
           </div>
         )
@@ -154,7 +173,7 @@ function ListPane({ rep, scope, emptyText, groupByDate }) {
 /* ── Calendar view ── */
 const DOW = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa']
 
-function CalendarPane({ rep }) {
+function CalendarPane({ rep, onItemClick, loadingId }) {
   const [anchor, setAnchor] = useState(dayjs().startOf('month'))
   const [items, setItems] = useState(null)
   const [selected, setSelected] = useState(dayjs().format('YYYY-MM-DD'))
@@ -242,7 +261,9 @@ function CalendarPane({ rep }) {
           : selectedItems.length === 0 ? <EmptyState text="No follow-ups on this day." />
           : (
             <div className="bg-[#0d0d0d] border border-[#1f1f1f] rounded-lg overflow-hidden">
-              {selectedItems.map((it) => <ActionItem key={it.id} item={it} showDate={false} />)}
+              {selectedItems.map((it) => (
+                <ActionItem key={it.id} item={it} showDate={false} onOpen={onItemClick} loading={loadingId === String(it.id)} />
+              ))}
             </div>
           )}
       </div>
@@ -261,9 +282,34 @@ const VIEWS = [
 
 export default function RepOverview() {
   const { reps, fetchReps } = useSalesRepStore()
+  const { setDrawerOpen: openLeadDrawer } = useLeadStore()
+  const { setDrawerOpen: openPartnerDrawer } = usePartnerStore()
   const [summary, setSummary] = useState(null)
   const [selectedRep, setSelectedRep] = useState(null)
   const [view, setView] = useState('today')
+  const [loadingId, setLoadingId] = useState(null)
+
+  const handleItemClick = useCallback(async (item) => {
+    if (!item.subjectId || loadingId) return
+    setLoadingId(String(item.id))
+    try {
+      const url = item.type === 'partner'
+        ? `/api/partners/${item.subjectId}`
+        : `/api/leads/${item.subjectId}`
+      const res = await fetch(url)
+      if (!res.ok) throw new Error('Not found')
+      const data = await res.json()
+      if (item.type === 'partner') {
+        openPartnerDrawer(true, data)
+      } else {
+        openLeadDrawer(true, data)
+      }
+    } catch {
+      // silently ignore — item may have been deleted
+    } finally {
+      setLoadingId(null)
+    }
+  }, [loadingId, openLeadDrawer, openPartnerDrawer])
 
   const loadSummary = useCallback(() => {
     fetch('/api/dashboard/rep-summary')
@@ -379,13 +425,16 @@ export default function RepOverview() {
           exit={{ opacity: 0 }}
           transition={{ duration: 0.16 }}
         >
-          {view === 'overdue'  && <ListPane rep={selectedRep} scope="overdue"  groupByDate emptyText="Nothing overdue — all caught up." />}
-          {view === 'today'    && <ListPane rep={selectedRep} scope="today"    emptyText="No follow-ups scheduled for today." />}
-          {view === 'week'     && <ListPane rep={selectedRep} scope="week"     groupByDate emptyText="Nothing else scheduled this week." />}
-          {view === 'upcoming' && <ListPane rep={selectedRep} scope="upcoming" groupByDate emptyText="No upcoming follow-ups in the next 90 days." />}
-          {view === 'calendar' && <CalendarPane rep={selectedRep} />}
+          {view === 'overdue'  && <ListPane rep={selectedRep} scope="overdue"  groupByDate emptyText="Nothing overdue — all caught up."           onItemClick={handleItemClick} loadingId={loadingId} />}
+          {view === 'today'    && <ListPane rep={selectedRep} scope="today"              emptyText="No follow-ups scheduled for today."             onItemClick={handleItemClick} loadingId={loadingId} />}
+          {view === 'week'     && <ListPane rep={selectedRep} scope="week"     groupByDate emptyText="Nothing else scheduled this week."            onItemClick={handleItemClick} loadingId={loadingId} />}
+          {view === 'upcoming' && <ListPane rep={selectedRep} scope="upcoming" groupByDate emptyText="No upcoming follow-ups in the next 90 days."  onItemClick={handleItemClick} loadingId={loadingId} />}
+          {view === 'calendar' && <CalendarPane rep={selectedRep} onItemClick={handleItemClick} loadingId={loadingId} />}
         </motion.div>
       </AnimatePresence>
+
+      <LeadDrawer />
+      <PartnerDrawer />
     </div>
   )
 }

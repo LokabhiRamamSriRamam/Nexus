@@ -1,11 +1,12 @@
 import { NavLink } from 'react-router-dom'
-import { LayoutDashboard, PhoneCall, TrendingUp, Handshake, Users } from 'lucide-react'
+import { LayoutDashboard, PhoneCall, TrendingUp, FlaskConical, Handshake, Users } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const NAV = [
   { to: '/',               icon: LayoutDashboard, label: 'Home' },
   { to: '/pre-sales',      icon: PhoneCall,        label: 'Pre-Sales' },
   { to: '/sales-pipeline', icon: TrendingUp,       label: 'Pipeline' },
+  { to: '/free-trial',     icon: FlaskConical,     label: 'Trial' },
   { to: '/post-sales',     icon: Handshake,        label: 'Post-Sales' },
   { to: '/partnerships',   icon: Users,            label: 'Partners' },
 ]

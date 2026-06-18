@@ -11,18 +11,19 @@ const interactionSchema = new mongoose.Schema(
     time:    { type: String },
     method:  {
       type: String,
-      enum: ['call', 'email', 'whatsapp', 'google-meet', 'in-person', 'other'],
+      enum: ['call', 'email', 'whatsapp', 'google-meet', 'in-person', 'walk-in', 'other'],
       required: true,
       default: 'call',
     },
     outcome: {
       type: String,
       enum: [
-        // pre-sales outcomes
+        // generic / pre-sales
         'fresh-lead', 'call-made', 'call-not-picked', 'follow-up-scheduled', 'demo-scheduled',
-        // sales-pipeline outcomes
-        'follow-up-needed', 'interested', 'not-interested', 'negotiation', 'demo-scheduled', 'deal-sent', 'paid',
-        // post-sales outcomes
+        'email-sent', 'email-replied', 'message-sent', 'message-replied', 'walked-in',
+        // sales-pipeline
+        'follow-up-needed', 'interested', 'not-interested', 'negotiation', 'deal-sent', 'paid',
+        // post-sales
         'renewal-discussion', 'renewal-confirmed', 'churned',
       ],
       required: true,

@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Phone, Calendar, Loader2 } from 'lucide-react'
+import { Phone, Calendar, Loader2, Skull } from 'lucide-react'
 import dayjs from 'dayjs'
 import { cn } from '@/lib/utils'
 import { useInteractionStore } from '@/store/interactionStore'
@@ -32,6 +32,25 @@ const PRIORITY = {
 }
 
 const METHODS_BY_STAGE = {
+  'pre-sales': [
+    { t: 'call',     label: 'Call',     color: '#3B82F6' },
+    { t: 'email',    label: 'Email',    color: '#22C55E' },
+    { t: 'whatsapp', label: 'WhatsApp', color: '#25D366' },
+    { t: 'walk-in',  label: 'Walk-in',  color: '#F59E0B' },
+  ],
+  'free-trial': [
+    { t: 'call',     label: 'Call',     color: '#3B82F6' },
+    { t: 'email',    label: 'Email',    color: '#22C55E' },
+    { t: 'whatsapp', label: 'WhatsApp', color: '#25D366' },
+    { t: 'walk-in',  label: 'Walk-in',  color: '#F59E0B' },
+  ],
+  'sales-pipeline': [
+    { t: 'call',        label: 'Call',        color: '#3B82F6' },
+    { t: 'google-meet', label: 'Google Meet', color: '#EA4335' },
+    { t: 'in-person',   label: 'In-Person',   color: '#A855F7' },
+    { t: 'email',       label: 'Email',       color: '#22C55E' },
+    { t: 'other',       label: 'Other',       color: '#888888' },
+  ],
   'post-sales': [
     { t: 'call',        label: 'Call',        color: '#3B82F6' },
     { t: 'google-meet', label: 'Google Meet', color: '#EA4335' },
@@ -39,41 +58,62 @@ const METHODS_BY_STAGE = {
     { t: 'email',       label: 'Email',       color: '#22C55E' },
     { t: 'other',       label: 'Other',       color: '#888888' },
   ],
-  'pre-sales':      [
-    { t: 'call',     label: 'Call',     color: '#3B82F6' },
-    { t: 'email',    label: 'Email',    color: '#22C55E' },
-    { t: 'whatsapp', label: 'WhatsApp', color: '#25D366' },
-  ],
-  'sales-pipeline': [
-    { t: 'call',        label: 'Call',         color: '#3B82F6' },
-    { t: 'google-meet', label: 'Google Meet',  color: '#EA4335' },
-    { t: 'in-person',   label: 'In-Person',    color: '#A855F7' },
-    { t: 'email',       label: 'Email',        color: '#22C55E' },
-    { t: 'other',       label: 'Other',        color: '#888888' },
-  ],
 }
 
-const OUTCOMES_BY_STAGE = {
-  'post-sales': [
-    { t: 'renewal-discussion', label: 'Renewal Discussion', color: '#3B82F6' },
-    { t: 'renewal-confirmed',  label: 'Renewal Confirmed',  color: '#22C55E' },
-    { t: 'churned',            label: 'Churned',            color: '#FF4444' },
-  ],
-  'pre-sales': [
-    { t: 'call-made',           label: 'Call Made',           color: '#3B82F6' },
-    { t: 'call-not-picked',     label: 'Not Picked',          color: '#FF4444' },
-    { t: 'follow-up-scheduled', label: 'Follow-up Scheduled', color: '#FF8C00' },
-    { t: 'demo-scheduled',      label: 'Demo Scheduled',      color: '#E8FF47' },
-  ],
-  'sales-pipeline': [
-    { t: 'follow-up-needed', label: 'Follow-up Needed', color: '#FF8C00' },
-    { t: 'interested',       label: 'Interested',       color: '#22C55E' },
-    { t: 'not-interested',   label: 'Not Interested',   color: '#FF4444' },
-    { t: 'negotiation',      label: 'Negotiation',      color: '#A855F7' },
-    { t: 'demo-scheduled',   label: 'Demo Scheduled',   color: '#E8FF47' },
-    { t: 'deal-sent',        label: 'Deal Sent',        color: '#3B82F6' },
-    { t: 'paid',             label: 'Paid',             color: '#22C55E' },
-  ],
+/* All outcome definitions — shared lookup */
+const OUTCOME_DEF = {
+  'call-made':          { label: 'Call Made',          color: '#3B82F6' },
+  'call-not-picked':    { label: 'Not Picked',          color: '#FF4444' },
+  'email-sent':         { label: 'Email Sent',          color: '#22C55E' },
+  'email-replied':      { label: 'Email Replied',       color: '#10B981' },
+  'message-sent':       { label: 'Message Sent',        color: '#25D366' },
+  'message-replied':    { label: 'Msg Replied',         color: '#059669' },
+  'walked-in':          { label: 'Walked In',           color: '#F59E0B' },
+  'follow-up-scheduled':{ label: 'Follow-up Scheduled', color: '#FF8C00' },
+  'demo-scheduled':     { label: 'Demo Scheduled',      color: '#E8FF47' },
+  'follow-up-needed':   { label: 'Follow-up Needed',    color: '#FF8C00' },
+  'interested':         { label: 'Interested',           color: '#22C55E' },
+  'not-interested':     { label: 'Not Interested',       color: '#FF4444' },
+  'negotiation':        { label: 'Negotiation',          color: '#A855F7' },
+  'deal-sent':          { label: 'Deal Sent',            color: '#3B82F6' },
+  'paid':               { label: 'Paid',                 color: '#22C55E' },
+  'renewal-discussion': { label: 'Renewal Discussion',   color: '#3B82F6' },
+  'renewal-confirmed':  { label: 'Renewal Confirmed',    color: '#22C55E' },
+  'churned':            { label: 'Churned',              color: '#FF4444' },
+}
+
+const OUTCOMES_BY_METHOD = {
+  'pre-sales': {
+    'call':     ['call-made', 'call-not-picked', 'follow-up-scheduled', 'demo-scheduled', 'not-interested'],
+    'email':    ['email-sent', 'email-replied', 'follow-up-scheduled', 'demo-scheduled', 'not-interested'],
+    'whatsapp': ['message-sent', 'message-replied', 'follow-up-scheduled', 'demo-scheduled', 'not-interested'],
+    'walk-in':  ['walked-in', 'follow-up-scheduled', 'demo-scheduled', 'not-interested'],
+  },
+  'free-trial': {
+    'call':     ['call-made', 'call-not-picked', 'follow-up-scheduled', 'not-interested'],
+    'email':    ['email-sent', 'email-replied', 'follow-up-scheduled', 'not-interested'],
+    'whatsapp': ['message-sent', 'message-replied', 'follow-up-scheduled', 'not-interested'],
+    'walk-in':  ['walked-in', 'follow-up-scheduled', 'not-interested'],
+  },
+  'sales-pipeline': {
+    'call':        ['call-made', 'call-not-picked', 'follow-up-needed', 'interested', 'negotiation', 'deal-sent', 'paid', 'not-interested'],
+    'google-meet': ['follow-up-needed', 'interested', 'negotiation', 'deal-sent', 'paid', 'not-interested'],
+    'in-person':   ['walked-in', 'follow-up-needed', 'interested', 'negotiation', 'deal-sent', 'paid', 'not-interested'],
+    'email':       ['email-sent', 'email-replied', 'follow-up-needed', 'deal-sent', 'paid', 'not-interested'],
+    'other':       ['follow-up-needed', 'interested', 'negotiation', 'paid', 'not-interested'],
+  },
+  'post-sales': {
+    'call':        ['renewal-discussion', 'renewal-confirmed', 'follow-up-needed', 'churned'],
+    'google-meet': ['renewal-discussion', 'renewal-confirmed', 'follow-up-needed', 'churned'],
+    'in-person':   ['renewal-discussion', 'renewal-confirmed', 'follow-up-needed', 'churned'],
+    'email':       ['email-sent', 'email-replied', 'renewal-discussion', 'renewal-confirmed'],
+    'other':       ['renewal-discussion', 'renewal-confirmed', 'churned'],
+  },
+}
+
+function getOutcomePills(stage, method) {
+  const keys = OUTCOMES_BY_METHOD[stage]?.[method] ?? OUTCOMES_BY_METHOD['pre-sales']?.['call'] ?? []
+  return keys.map((k) => ({ t: k, ...(OUTCOME_DEF[k] ?? { label: k, color: '#888' }) }))
 }
 
 function PillRow({ label, items, selected, onSelect }) {
@@ -103,21 +143,44 @@ function PillRow({ label, items, selected, onSelect }) {
 }
 
 function QuickLogForm({ lead, onDone, onCancel }) {
-  const stage    = lead.stage ?? 'pre-sales'
-  const methods  = METHODS_BY_STAGE[stage]  ?? METHODS_BY_STAGE['pre-sales']
-  const outcomes = OUTCOMES_BY_STAGE[stage] ?? OUTCOMES_BY_STAGE['pre-sales']
+  const stage   = lead.stage ?? 'pre-sales'
+  const methods = METHODS_BY_STAGE[stage] ?? METHODS_BY_STAGE['pre-sales']
+  const canMarkLost = ['pre-sales', 'sales-pipeline', 'free-trial'].includes(stage)
 
-  const [method,          setMethod]         = useState(methods[0].t)
-  const [outcome,         setOutcome]        = useState(outcomes[0].t)
-  const [mom,             setMom]            = useState('')
+  const [method,           setMethod]          = useState(methods[0].t)
+  const [outcome,          setOutcome]         = useState(() => getOutcomePills(stage, methods[0].t)[0]?.t ?? '')
+  const [mom,              setMom]             = useState('')
   const [nextFollowUpDate, setNextFollowUpDate] = useState('')
   const [nextFollowUpTime, setNextFollowUpTime] = useState('')
-  const [saving,          setSaving]         = useState(false)
+  const [saving,           setSaving]          = useState(false)
+  const [markingLost,      setMarkingLost]     = useState(false)
   const textRef = useRef(null)
   const { createInteraction } = useInteractionStore()
-  const { advanceLeadStage, updateLeadLocal } = useLeadStore()
+  const { advanceLeadStage, updateLeadLocal, updateStage } = useLeadStore()
+
+  const outcomes = getOutcomePills(stage, method)
+
+  const handleMethodChange = (m) => {
+    setMethod(m)
+    const pills = getOutcomePills(stage, m)
+    setOutcome(pills[0]?.t ?? '')
+  }
 
   useEffect(() => { textRef.current?.focus() }, [])
+
+  const handleMarkLost = async (e) => {
+    e.stopPropagation()
+    if (!window.confirm('Mark this lead as a Dead End / Lost?')) return
+    setMarkingLost(true)
+    try {
+      await updateStage(lead._id, 'lost')
+      onDone()
+      toast.success('Lead marked as Dead End')
+    } catch {
+      toast.error('Failed to update')
+      setMarkingLost(false)
+    }
+  }
 
   const submit = async () => {
     if (!mom.trim()) return
@@ -167,10 +230,10 @@ function QuickLogForm({ lead, onDone, onCancel }) {
       className="overflow-hidden"
     >
       <div className="pt-3 space-y-2.5" onClick={(e) => e.stopPropagation()}>
-        <PillRow label="Method"  items={methods}  selected={method}  onSelect={setMethod} />
+        <PillRow label="Method"  items={methods}  selected={method}  onSelect={handleMethodChange} />
         <PillRow label="Outcome" items={outcomes} selected={outcome} onSelect={setOutcome} />
 
-        {stage === 'pre-sales' && outcome === 'demo-scheduled' && (
+        {['pre-sales', 'free-trial'].includes(stage) && outcome === 'demo-scheduled' && (
           <p className="text-[11px] text-[#E8FF47] bg-[#E8FF47]/8 border border-[#E8FF47]/20 rounded px-2 py-1">
             Lead will move to Sales Pipeline.
           </p>
@@ -218,10 +281,22 @@ function QuickLogForm({ lead, onDone, onCancel }) {
           </div>
         </div>
 
-        <div className="flex items-center justify-between">
-          <button onClick={onCancel} className="text-[11px] text-[#555] hover:text-[#888] transition-colors">
-            Cancel
-          </button>
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <button onClick={onCancel} className="text-[11px] text-[#555] hover:text-[#888] transition-colors">
+              Cancel
+            </button>
+            {canMarkLost && (
+              <button
+                onClick={handleMarkLost}
+                disabled={markingLost}
+                className="flex items-center gap-1 text-[11px] text-[#555] hover:text-p0 transition-colors disabled:opacity-40"
+              >
+                {markingLost ? <Loader2 size={10} className="animate-spin" /> : <Skull size={10} />}
+                Dead End
+              </button>
+            )}
+          </div>
           <button
             onClick={submit}
             disabled={saving || !mom.trim()}
@@ -236,31 +311,9 @@ function QuickLogForm({ lead, onDone, onCancel }) {
   )
 }
 
-/* ── Outcome chip shown on the card (latest outcome) ── */
-const OUTCOME_COLORS = {
-  'renewal-discussion':   '#3B82F6',
-  'renewal-confirmed':    '#22C55E',
-  'churned':              '#FF4444',
-  'fresh-lead':           '#888888',
-  'call-made':            '#3B82F6',
-  'call-not-picked':      '#FF4444',
-  'follow-up-scheduled':  '#FF8C00',
-  'demo-scheduled':       '#E8FF47',
-  'follow-up-needed':     '#FF8C00',
-  'deal-sent':            '#3B82F6',
-  'interested':           '#22C55E',
-  'not-interested':       '#FF4444',
-  'negotiation':          '#A855F7',
-  'paid':                 '#22C55E',
-}
-const OUTCOME_LABELS = {
-  'renewal-discussion': 'Renewal Discussion', 'renewal-confirmed': 'Renewal Confirmed', 'churned': 'Churned',
-  'fresh-lead': 'Fresh Lead', 'call-made': 'Call Made', 'call-not-picked': 'Not Picked',
-  'follow-up-scheduled': 'Follow-up', 'demo-scheduled': 'Demo Scheduled',
-  'deal-sent': 'Deal Sent',
-  'follow-up-needed': 'Follow-up', 'interested': 'Interested',
-  'not-interested': 'Not Interested', 'negotiation': 'Negotiation', 'paid': 'Paid',
-}
+/* ── Outcome chip shown on the card — derive from OUTCOME_DEF ── */
+const OUTCOME_COLORS  = Object.fromEntries(Object.entries(OUTCOME_DEF).map(([k, v]) => [k, v.color]))
+const OUTCOME_LABELS  = Object.fromEntries(Object.entries(OUTCOME_DEF).map(([k, v]) => [k, v.label]))
 
 export default function LeadCard({ lead, onDetailOpen, index }) {
   const [logging, setLogging] = useState(false)

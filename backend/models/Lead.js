@@ -17,7 +17,8 @@ const leadSchema = new mongoose.Schema(
       type: String,
       enum: [
         'fresh-lead', 'call-made', 'call-not-picked', 'follow-up-scheduled', 'demo-scheduled',
-        'follow-up-needed', 'interested', 'not-interested', 'negotiation', 'demo-scheduled', 'deal-sent', 'paid',
+        'email-sent', 'email-replied', 'message-sent', 'message-replied', 'walked-in',
+        'follow-up-needed', 'interested', 'not-interested', 'negotiation', 'deal-sent', 'paid',
         'renewal-discussion', 'renewal-confirmed', 'churned',
       ],
       default: 'fresh-lead',
@@ -28,9 +29,12 @@ const leadSchema = new mongoose.Schema(
     referredBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Lead' },
     stage: {
       type: String,
-      enum: ['pre-sales', 'sales-pipeline', 'post-sales', 'lost'],
+      enum: ['pre-sales', 'sales-pipeline', 'free-trial', 'post-sales', 'lost'],
       default: 'pre-sales',
     },
+    trialStartDate: { type: Date },
+    trialDays:      { type: Number },
+    trialEndDate:   { type: Date },
   },
   { timestamps: true }
 )

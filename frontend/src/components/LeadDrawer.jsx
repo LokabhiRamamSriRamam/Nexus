@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, Edit2, Trash2, Phone, Mail, MapPin, Calendar, User, Tag, Clock, ExternalLink, ArrowRight, ArrowLeft, IndianRupee, RefreshCw, Plus, Download } from 'lucide-react'
+import { X, Edit2, Trash2, Phone, Mail, MapPin, Calendar, User, Tag, Clock, ExternalLink, ArrowRight, ArrowLeft, IndianRupee, RefreshCw, Plus, Download, FlaskConical, Skull } from 'lucide-react'
 import dayjs from 'dayjs'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
@@ -27,6 +27,7 @@ const SOURCE_LABELS = {
 const STAGE_LABELS = {
   'pre-sales': 'Pre-Sales',
   'sales-pipeline': 'Sales Pipeline',
+  'free-trial': 'Free Trial',
   'post-sales': 'Post-Sales',
   'lost': 'Lost',
 }
@@ -47,21 +48,46 @@ function Detail({ icon: Icon, label, value, mono = false }) {
 /* Stage move footer */
 function StageBar({ lead }) {
   const { updateStage, setDrawerOpen } = useLeadStore()
+  const [trialInput, setTrialInput] = useState(false)
+  const [trialDays, setTrialDays] = useState('')
+  const [moving, setMoving] = useState(false)
+  const inputRef = useRef(null)
 
-  const move = async (stage, label) => {
+  const move = async (stage, label, extras = {}) => {
+    setMoving(true)
     try {
-      await updateStage(lead._id, stage)
+      await updateStage(lead._id, stage, extras)
       setDrawerOpen(false)
       toast.success(`Moved to ${label}`)
     } catch {
       toast.error('Stage update failed')
+    } finally {
+      setMoving(false)
     }
+  }
+
+  const markLost = async () => {
+    if (!window.confirm('Mark this lead as a Dead End / Lost? It will be removed from the active pipeline.')) return
+    await move('lost', 'Dead End')
+  }
+
+  const LostButton = () => (
+    <Button size="sm" onClick={markLost} disabled={moving}
+      className="h-7 px-3 text-xs border-p0/30 text-[#666] hover:text-p0 hover:border-p0/60 gap-1" variant="outline">
+      <Skull size={10} /> Dead End
+    </Button>
+  )
+
+  const startTrial = async () => {
+    const days = parseInt(trialDays, 10)
+    if (!days || days < 1) { toast.error('Enter a valid number of days'); return }
+    await move('free-trial', 'Free Trial', { trialDays: days })
   }
 
   if (lead.stage === 'pre-sales') {
     return (
-      <div className="px-5 py-3 border-t border-[#1e1e1e] flex items-center justify-between">
-        <span className="text-[#555] text-xs">Stage: Pre-Sales</span>
+      <div className="px-5 py-3 border-t border-[#1e1e1e] flex items-center justify-between gap-2">
+        <LostButton />
         <span className="text-[11px] text-[#555] italic">Log a demo to advance</span>
       </div>
     )
@@ -69,23 +95,83 @@ function StageBar({ lead }) {
 
   if (lead.stage === 'sales-pipeline') {
     return (
-      <div className="px-5 py-3 border-t border-[#1e1e1e] flex items-center justify-between gap-2">
-        <Button
-          size="sm"
-          onClick={() => move('pre-sales', 'Pre-Sales')}
-          className="h-7 px-3 text-xs border-[#2e2e2e] text-[#888] hover:text-[#ccc] gap-1.5"
-          variant="outline"
-        >
-          <ArrowLeft size={11} /> Back to Pre-Sales
-        </Button>
-        <Button
-          size="sm"
-          onClick={() => move('post-sales', 'Post-Sales')}
-          className="h-7 px-3 text-xs bg-success/10 text-success border border-success/30 hover:bg-success/20 gap-1.5"
-          variant="outline"
-        >
-          Move to Post-Sales <ArrowRight size={11} />
-        </Button>
+      <div className="px-5 py-3 border-t border-[#1e1e1e] space-y-2">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-1.5">
+            <Button size="sm" onClick={() => move('pre-sales', 'Pre-Sales')} disabled={moving}
+              className="h-7 px-3 text-xs border-[#2e2e2e] text-[#888] hover:text-[#ccc] gap-1.5" variant="outline">
+              <ArrowLeft size={11} /> Pre-Sales
+            </Button>
+            <LostButton />
+          </div>
+          <div className="flex items-center gap-1.5">
+            <Button size="sm" onClick={() => { setTrialInput((v) => !v); setTimeout(() => inputRef.current?.focus(), 50) }} disabled={moving}
+              className="h-7 px-3 text-xs bg-amber-500/10 text-amber-400 border border-amber-500/30 hover:bg-amber-500/20 gap-1.5" variant="outline">
+              <FlaskConical size={11} /> Free Trial
+            </Button>
+            <Button size="sm" onClick={() => move('post-sales', 'Post-Sales')} disabled={moving}
+              className="h-7 px-3 text-xs bg-success/10 text-success border border-success/30 hover:bg-success/20 gap-1.5" variant="outline">
+              Post-Sales <ArrowRight size={11} />
+            </Button>
+          </div>
+        </div>
+        <AnimatePresence>
+          {trialInput && (
+            <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}
+              className="flex items-center gap-2 overflow-hidden">
+              <input
+                ref={inputRef}
+                type="number"
+                min="1"
+                value={trialDays}
+                onChange={(e) => setTrialDays(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && startTrial()}
+                placeholder="e.g. 14"
+                className="flex-1 h-7 bg-[#1a1a1a] border border-[#2e2e2e] rounded-md px-2.5 text-xs text-[#e0e0e0] placeholder:text-[#444] focus:outline-none focus:border-amber-500/50"
+              />
+              <span className="text-[#555] text-xs shrink-0">days</span>
+              <Button size="sm" onClick={startTrial} disabled={moving || !trialDays}
+                className="h-7 px-3 text-xs bg-amber-500/15 text-amber-400 border border-amber-500/40 hover:bg-amber-500/25 shrink-0" variant="outline">
+                Start
+              </Button>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+    )
+  }
+
+  if (lead.stage === 'free-trial') {
+    const daysLeft = lead.trialEndDate ? dayjs(lead.trialEndDate).diff(dayjs(), 'day') : null
+    const expired  = daysLeft !== null && daysLeft < 0
+    return (
+      <div className="px-5 py-3 border-t border-[#1e1e1e] space-y-2">
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <div className="flex items-center gap-1.5">
+            {daysLeft !== null && (
+              <span className={`text-xs font-medium px-2 py-0.5 rounded border ${
+                expired
+                  ? 'bg-p0/10 text-p0 border-p0/30'
+                  : daysLeft <= 3
+                    ? 'bg-amber-500/10 text-amber-400 border-amber-500/30'
+                    : 'bg-success/10 text-success border-success/30'
+              }`}>
+                {expired ? `Expired ${Math.abs(daysLeft)}d ago` : daysLeft === 0 ? 'Expires today' : `${daysLeft}d remaining`}
+              </span>
+            )}
+            <LostButton />
+          </div>
+          <div className="flex items-center gap-1.5">
+            <Button size="sm" onClick={() => move('sales-pipeline', 'Sales Pipeline')} disabled={moving}
+              className="h-7 px-3 text-xs border-[#2e2e2e] text-[#888] hover:text-[#ccc] gap-1.5" variant="outline">
+              <ArrowLeft size={11} /> Pipeline
+            </Button>
+            <Button size="sm" onClick={() => move('post-sales', 'Post-Sales')} disabled={moving}
+              className="h-7 px-3 text-xs bg-success/10 text-success border border-success/30 hover:bg-success/20 gap-1.5" variant="outline">
+              Convert <ArrowRight size={11} />
+            </Button>
+          </div>
+        </div>
       </div>
     )
   }
@@ -94,12 +180,8 @@ function StageBar({ lead }) {
     return (
       <div className="px-5 py-3 border-t border-[#1e1e1e] flex items-center justify-between">
         <span className="text-[#555] text-xs">Stage: Post-Sales</span>
-        <Button
-          size="sm"
-          onClick={() => move('sales-pipeline', 'Sales Pipeline')}
-          className="h-7 px-3 text-xs border-[#2e2e2e] text-[#888] hover:text-[#ccc] gap-1.5"
-          variant="outline"
-        >
+        <Button size="sm" onClick={() => move('sales-pipeline', 'Sales Pipeline')}
+          className="h-7 px-3 text-xs border-[#2e2e2e] text-[#888] hover:text-[#ccc] gap-1.5" variant="outline">
           <ArrowLeft size={11} /> Back to Pipeline
         </Button>
       </div>
@@ -117,7 +199,8 @@ export default function LeadDrawer() {
 
   const isPostSales    = selectedLead?.stage === 'post-sales'
   const isSalesPipeline = selectedLead?.stage === 'sales-pipeline'
-  const hasDealTab     = isPostSales || isSalesPipeline
+  const isFreeTrial    = selectedLead?.stage === 'free-trial'
+  const hasDealTab     = isPostSales || isSalesPipeline || isFreeTrial
   const deal = selectedLead ? byLead[selectedLead._id] : undefined
 
   useEffect(() => {
@@ -264,6 +347,33 @@ export default function LeadDrawer() {
                     value={`${dayjs(selectedLead.followUpDate).format('D MMM YYYY')}${selectedLead.followUpTime ? ' · ' + selectedLead.followUpTime : ''}`}
                   />
                 )}
+                {selectedLead.trialStartDate && (
+                  <Detail icon={FlaskConical} label="Trial Start" value={dayjs(selectedLead.trialStartDate).format('D MMM YYYY')} />
+                )}
+                {selectedLead.trialEndDate && (() => {
+                  const daysLeft = dayjs(selectedLead.trialEndDate).diff(dayjs(), 'day')
+                  const expired  = daysLeft < 0
+                  return (
+                    <div className="flex items-start gap-3 py-2.5 border-b border-[#1e1e1e]">
+                      <FlaskConical size={13} className="text-[#555] mt-0.5 shrink-0" />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[10px] text-[#555] uppercase tracking-wider mb-0.5">Trial End</p>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <p className="text-[#e0e0e0] text-sm">{dayjs(selectedLead.trialEndDate).format('D MMM YYYY')}</p>
+                          <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded border ${
+                            expired
+                              ? 'bg-p0/10 text-p0 border-p0/30'
+                              : daysLeft <= 3
+                                ? 'bg-amber-500/10 text-amber-400 border-amber-500/30'
+                                : 'bg-success/10 text-success border-success/30'
+                          }`}>
+                            {expired ? `Expired ${Math.abs(daysLeft)}d ago` : daysLeft === 0 ? 'Expires today' : `${daysLeft}d left`}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })()}
                 {selectedLead.notes && (
                   <div className="py-2.5 border-b border-[#1e1e1e] last:border-0">
                     <p className="text-[10px] text-[#555] uppercase tracking-wider mb-1.5">Notes</p>

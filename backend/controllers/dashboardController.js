@@ -200,15 +200,16 @@ export const getRepAgenda = async (req, res) => {
       {
         $project: {
           _id: 1,
-          date:     '$reminderDate',
-          time:     '$reminderTime',
-          name:     '$subject.businessName',
-          priority: '$subject.priority',
-          phone:    '$subject.phone',
-          stage:    '$subject.stage',
-          rep:      '$repName',
-          contact:  { $ifNull: ['$subject.clientPOC', '$subject.contactName'] },
-          type:     { $cond: ['$isPartner', 'partner', 'lead'] },
+          date:      '$reminderDate',
+          time:      '$reminderTime',
+          name:      '$subject.businessName',
+          priority:  '$subject.priority',
+          phone:     '$subject.phone',
+          stage:     '$subject.stage',
+          rep:       '$repName',
+          contact:   { $ifNull: ['$subject.clientPOC', '$subject.contactName'] },
+          type:      { $cond: ['$isPartner', 'partner', 'lead'] },
+          subjectId: '$subject._id',
         },
       },
     ]
@@ -217,6 +218,7 @@ export const getRepAgenda = async (req, res) => {
     res.json({
       items: items.map((i) => ({
         id: i._id,
+        subjectId: i.subjectId,
         name: i.name,
         priority: i.priority,
         phone: i.phone,
